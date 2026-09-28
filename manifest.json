@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "ATS Priority Watermark",
+  "version": "1.0.0",
+  "description": "Identifies recruiting ATS pages and displays their application priority.",
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "ats-rules.js",
+        "content.js"
+      ],
+      "css": [
+        "watermark.css"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}
