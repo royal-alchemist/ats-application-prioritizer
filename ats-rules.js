@@ -13,30 +13,26 @@
   const PRIORITY_GROUPS = {
     P0: {
       id: "P0",
-      label: "Put most of the effot HERE.",
-      message: "Highest-priority application",
-      className: "ats-priority-p0"
+      label: "TOP",
+      watermarkLabel: "FOCUS HERE"
     },
-
+  
     P1: {
       id: "P1",
-      label: "Put a little more effort here.",
-      message: "Worth extra effort",
-      className: "ats-priority-p1"
+      label: "HIGH",
+      watermarkLabel: "PRIORITIZE"
     },
-
+  
     P2: {
       id: "P2",
-      label: "Go as you've been doing.",
-      message: "Maintain normal effort",
-      className: "ats-priority-p2"
+      label: "MEDIUM",
+      watermarkLabel: "APPLY NORMALLY"
     },
-
+  
     P3: {
       id: "P3",
-      label: "Useless, skip.",
-      message: "Low observed return",
-      className: "ats-priority-p3"
+      label: "SKIP",
+      watermarkLabel: "SKIP"
     }
   };
 
@@ -363,6 +359,42 @@
     }
   ];
 
+  const DIRECT_RULE = {
+    name: "Direct",
+    group: "P2",
+  
+    /*
+     * These indicate that an otherwise-unrecognized URL
+     * is probably a company career/application page.
+     */
+    matches: [
+      "careers.",
+      "jobs.",
+      "/careers/",
+      "/career/",
+      "/jobs/",
+      "/job/",
+      "/apply/",
+      "/application/",
+      "/applications/",
+      "/opportunities/"
+    ],
+  
+    /*
+     * Don't accidentally classify job-search/source sites
+     * as "Direct".
+     */
+    excludes: [
+      "linkedin.com",
+      "indeed.com",
+      "glassdoor.com",
+      "ziprecruiter.com",
+      "jobright.ai",
+      "hiring.cafe",
+      "remoterocketship.com",
+      "builtin.com"
+    ]
+  };
 
   /**
    * Classify a URL.
@@ -433,40 +465,3 @@
   });
 
 })();
-
-const DIRECT_RULE = {
-  name: "Direct",
-  group: "P2",
-
-  /*
-   * These indicate that an otherwise-unrecognized URL
-   * is probably a company career/application page.
-   */
-  matches: [
-    "careers.",
-    "jobs.",
-    "/careers/",
-    "/career/",
-    "/jobs/",
-    "/job/",
-    "/apply/",
-    "/application/",
-    "/applications/",
-    "/opportunities/"
-  ],
-
-  /*
-   * Don't accidentally classify job-search/source sites
-   * as "Direct".
-   */
-  excludes: [
-    "linkedin.com",
-    "indeed.com",
-    "glassdoor.com",
-    "ziprecruiter.com",
-    "jobright.ai",
-    "hiring.cafe",
-    "remoterocketship.com",
-    "builtin.com"
-  ]
-};

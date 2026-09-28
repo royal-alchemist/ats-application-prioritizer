@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <title>Prioritizer</title>
+
+  <link
+    rel="stylesheet"
+    href="sidepanel.css"
+  >
+</head>
+
+<body>
+
+  <div class="app">
+
+    <!-- HEADER -->
+    <header class="header">
+
+      <div class="brand">
+        Prioritizer
+      </div>
+
+      <button
+        id="themeToggle"
+        class="theme-toggle"
+        type="button"
+        aria-label="Toggle theme"
+      >
+        ☾
+      </button>
+
+    </header>
+
+
+    <!-- SUMMARY -->
+    <section class="summary">
+
+      <div class="summary-item">
+        <div class="summary-top">
+          <span class="dot p0"></span>
+          <span id="countP0">0</span>
+        </div>
+
+        <span class="summary-label">
+          FOCUS
+        </span>
+      </div>
+
+
+      <div class="summary-item">
+        <div class="summary-top">
+          <span class="dot p1"></span>
+          <span id="countP1">0</span>
+        </div>
+
+        <span class="summary-label">
+          PRIOR
+        </span>
+      </div>
+
+
+      <div class="summary-item">
+        <div class="summary-top">
+          <span class="dot p2"></span>
+          <span id="countP2">0</span>
+        </div>
+
+        <span class="summary-label">
+          NORMAL
+        </span>
+      </div>
+
+
+      <div class="summary-item">
+        <div class="summary-top">
+          <span class="dot p3"></span>
+          <span id="countP3">0</span>
+        </div>
+
+        <span class="summary-label">
+          SKIP
+        </span>
+      </div>
+
+    </section>
+
+
+    <!-- LIVE TAB LIST -->
+    <main
+      id="tabList"
+      class="tab-list"
+    ></main>
+
+
+    <div
+      id="emptyState"
+      class="empty-state"
+    >
+      No application tabs open.
+    </div>
+
+
+    <!-- BOTTOM -->
+    <footer class="footer">
+
+      <button
+        id="reprioritize"
+        class="reprioritize"
+        type="button"
+      >
+        RE-PRIORITIZE
+      </button>
+
+
+      <div class="watermark-row">
+
+        <span>
+          Watermark
+        </span>
+
+        <label class="switch">
+
+          <input
+            id="watermarkToggle"
+            type="checkbox"
+            checked
+          >
+
+          <span class="slider"></span>
+
+        </label>
+
+      </div>
+
+    </footer>
+
+  </div>
+
+
+  <script src="sidepanel.js"></script>
+
+</body>
+</html>

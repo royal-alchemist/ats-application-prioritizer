@@ -1,8 +1,33 @@
 {
   "manifest_version": 3,
-  "name": "ATS Priority Watermark",
-  "version": "1.0.0",
-  "description": "Identifies recruiting ATS pages and displays their application priority.",
+  "name": "Prioritizer",
+  "version": "2.1.0",
+  "description": "Prioritizes ATS and direct career application tabs.",
+
+  "permissions": [
+    "tabs",
+    "storage",
+    "sidePanel",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+
+  "action": {
+    "default_title": "Open Prioritizer"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+
   "content_scripts": [
     {
       "matches": [

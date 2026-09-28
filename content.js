@@ -1,6 +1,19 @@
 (() => {
   "use strict";
 
+  /*
+ * Prevent duplicate observers/listeners if Re-prioritize
+ * attempts to inject into an already-initialized page.
+ */
+  if (
+    globalThis.__ATS_PRIORITIZER_CONTENT_LOADED__
+  ) {
+    return;
+  }
+
+globalThis.__ATS_PRIORITIZER_CONTENT_LOADED__ =
+  true;
+
   const WATERMARK_ID = "__ats_priority_watermark__";
 
   let lastUrl = null;
@@ -10,24 +23,69 @@
   /**
    * Re-check the current URL and update the watermark.
    */
-  function refreshClassification() {
+  async function refreshClassification(
+    force = false
+  ) {
     scheduled = false;
-
-    const currentUrl = window.location.href;
-
-    if (currentUrl === lastUrl) {
+  
+    const currentUrl =
+      window.location.href;
+  
+  
+    /*
+     * Read the persisted global watermark setting.
+     */
+    const settings =
+      await chrome.storage.local.get({
+        watermarkEnabled: true
+      });
+  
+  
+    /*
+     * Watermark OFF must win regardless
+     * of whether the URL changed.
+     */
+    if (
+      settings.watermarkEnabled === false
+    ) {
+      lastUrl = currentUrl;
+  
+      removeWatermark();
+  
       return;
     }
-
+  
+  
+    /*
+     * Normal SPA observer refreshes can skip
+     * unchanged URLs.
+     *
+     * Explicit refreshes MUST NOT.
+     */
+    if (
+      !force &&
+      currentUrl === lastUrl
+    ) {
+      return;
+    }
+  
+  
     lastUrl = currentUrl;
-
-    const result = globalThis.ATS_PRIORITY?.classify(currentUrl);
-
+  
+  
+    const result =
+      globalThis.ATS_PRIORITY?.classify(
+        currentUrl
+      );
+  
+  
     if (!result) {
       removeWatermark();
+  
       return;
     }
-
+  
+  
     renderWatermark(result);
   }
 
@@ -42,7 +100,9 @@
 
     scheduled = true;
 
-    queueMicrotask(refreshClassification);
+    queueMicrotask(() => {
+      refreshClassification(false);
+    });
   }
 
 
@@ -189,15 +249,20 @@
     body.classList.add(result.group.toLowerCase());
 
     name.textContent = result.name;
-    priority.textContent = result.priority.label;
+    const watermarkLabel =
+      result.priority.watermarkLabel ??
+      result.priority.label;
+
+    priority.textContent =
+      watermarkLabel;
 
     /*
      * Helpful diagnostic info when hovering.
      */
     body.title =
-      `${result.name}\n` +
-      `${result.priority.message}\n` +
-      `Matched: ${result.matchedString}`;
+    `${result.name}\n` +
+    `${watermarkLabel}\n` +
+    `Matched: ${result.matchedString}`;
   }
 
 
@@ -257,6 +322,57 @@
     });
   }
 
+  /*
+ * Messages from background.js.
+ */
+chrome.runtime.onMessage.addListener(
+  (message, sender, sendResponse) => {
+
+    if (
+      message?.type ===
+      "PING_ATS_PRIORITIZER"
+    ) {
+      sendResponse({
+        ok: true
+      });
+
+      return;
+    }
+
+
+    if (
+      message?.type ===
+      "FORCE_ATS_REFRESH"
+    ) {
+      refreshClassification(true);
+
+      sendResponse({
+        ok: true
+      });
+
+      return;
+    }
+
+  }
+);
+
+
+/*
+ * React immediately when the sidebar's
+ * Watermark switch changes.
+ */
+chrome.storage.onChanged.addListener(
+  (changes, areaName) => {
+
+    if (
+      areaName === "local" &&
+      changes.watermarkEnabled
+    ) {
+      refreshClassification(true);
+    }
+
+  }
+);
 
   installHistoryHooks();
   installUrlObserver();
@@ -264,6 +380,6 @@
   /*
    * Initial classification.
    */
-  refreshClassification();
+  refreshClassification(true);
 
 })();
