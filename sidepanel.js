@@ -2,6 +2,7 @@
   "use strict";
 
   const elements = {
+    openApplyPages: document.getElementById("openApplyPages"),
     themeToggle: document.getElementById("themeToggle"),
     countAll: document.getElementById("countAll"),
     countP0: document.getElementById("countP0"),
@@ -260,6 +261,101 @@
     await syncActiveTab({ scroll: true });
   }
 
+  async function openAllApplicationPages() {
+
+    const button =
+      elements.openApplyPages;
+  
+  
+    button.disabled =
+      true;
+  
+    button.textContent =
+      "…";
+  
+  
+    try {
+  
+      const response =
+        await chrome.runtime.sendMessage({
+          type:
+            "OPEN_ALL_APPLICATION_PAGES"
+        });
+  
+  
+      if (!response?.ok) {
+  
+        console.error(
+          "Bulk application-page opening failed:",
+          response?.error
+        );
+  
+        button.textContent =
+          "!";
+  
+        return;
+      }
+  
+  
+      /*
+       * Brief visual confirmation.
+       *
+       * Example:
+       * 17 application pages opened.
+       */
+      button.textContent =
+        response.opened > 0
+          ? "✓"
+          : "0";
+  
+  
+      button.title =
+        [
+          `Recognized job tabs: ${response.recognized}`,
+          `Application pages opened: ${response.opened}`,
+          `Already open: ${response.alreadyOpen}`,
+          `Apply control not found: ${response.notFound}`,
+          `Failed: ${response.failed}`
+        ].join("\n");
+  
+  
+      /*
+       * Newly opened ATS tabs should immediately
+       * appear in the sidebar.
+       */
+      await loadTabState();
+  
+  
+      window.setTimeout(
+        () => {
+  
+          button.textContent =
+            "↗";
+  
+        },
+        1400
+      );
+  
+  
+    } catch (error) {
+  
+      console.error(
+        "Bulk application-page opening failed:",
+        error
+      );
+  
+      button.textContent =
+        "!";
+  
+  
+    } finally {
+  
+      button.disabled =
+        false;
+  
+    }
+  }
+
   async function reprioritize() {
     elements.reprioritize.disabled = true;
     elements.reprioritize.textContent = "RE-PRIORITIZING…";
@@ -321,6 +417,7 @@
   }
 
   function bindEvents() {
+    elements.openApplyPages.addEventListener("click", openAllApplicationPages);
     elements.themeToggle.addEventListener("click", toggleTheme);
     elements.reprioritize.addEventListener("click", reprioritize);
     elements.closeLinkedIn.addEventListener("click", closeJobrightLinkedInTabs);

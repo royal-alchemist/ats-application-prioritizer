@@ -49,6 +49,48 @@ button { font: inherit; }
   border-bottom: 1px solid var(--border);
 }
 .brand { font-size: 14px; font-weight: 750; }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 3px;
+}
+
+
+.header-icon-button {
+  width: 31px;
+  height: 31px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 50%;
+
+  background: transparent;
+  color: var(--text);
+
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+
+.header-icon-button:hover {
+  background: var(--hover);
+}
+
+
+.header-icon-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .theme-toggle {
   width: 31px; height: 31px;
   display: grid; place-items: center;
