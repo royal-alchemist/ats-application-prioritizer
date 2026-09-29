@@ -356,45 +356,17 @@
       matches: [
         "keka.com"
       ]
+    },
+    
+    {
+      name: "Personio",
+      group: "P3",
+      matches: [
+        "jobs.personio."
+      ]
     }
   ];
 
-  const DIRECT_RULE = {
-    name: "Direct",
-    group: "P2",
-  
-    /*
-     * These indicate that an otherwise-unrecognized URL
-     * is probably a company career/application page.
-     */
-    matches: [
-      "careers.",
-      "jobs.",
-      "/careers/",
-      "/career/",
-      "/jobs/",
-      "/job/",
-      "/apply/",
-      "/application/",
-      "/applications/",
-      "/opportunities/"
-    ],
-  
-    /*
-     * Don't accidentally classify job-search/source sites
-     * as "Direct".
-     */
-    excludes: [
-      "linkedin.com",
-      "indeed.com",
-      "glassdoor.com",
-      "ziprecruiter.com",
-      "jobright.ai",
-      "hiring.cafe",
-      "remoterocketship.com",
-      "builtin.com"
-    ]
-  };
 
   /**
    * Classify a URL.
@@ -465,3 +437,40 @@
   });
 
 })();
+
+const DIRECT_RULE = {
+  name: "Direct",
+  group: "P2",
+
+  /*
+   * These indicate that an otherwise-unrecognized URL
+   * is probably a company career/application page.
+   */
+  matches: [
+    "careers.",
+    "jobs.",
+    "/careers/",
+    "/career/",
+    "/jobs/",
+    "/job/",
+    "/apply/",
+    "/application/",
+    "/applications/",
+    "/opportunities/"
+  ],
+
+  /*
+   * Don't accidentally classify job-search/source sites
+   * as "Direct".
+   */
+  excludes: [
+    "linkedin.com",
+    "indeed.com",
+    "glassdoor.com",
+    "ziprecruiter.com",
+    "jobright.ai",
+    "hiring.cafe",
+    "remoterocketship.com",
+    "builtin.com"
+  ]
+};
