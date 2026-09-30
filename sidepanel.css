@@ -73,11 +73,15 @@ button { font: inherit; }
   background: transparent;
   color: var(--text);
 
-  font-size: 19px;
-  font-weight: 700;
-  line-height: 1;
-
   cursor: pointer;
+}
+
+
+.header-icon-button svg {
+  width: 16px;
+  height: 16px;
+
+  display: block;
 }
 
 
@@ -86,8 +90,14 @@ button { font: inherit; }
 }
 
 
+.header-icon-button:active {
+  transform: scale(0.92);
+}
+
+
 .header-icon-button:disabled {
-  opacity: 0.45;
+  opacity: 0.42;
+
   cursor: default;
 }
 
@@ -204,14 +214,52 @@ button { font: inherit; }
   outline-offset: 3px;
 }
 
-.ats-name {
+.ats-name-area {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
   overflow: hidden;
-  font-size: 12px;
-  font-weight: 650;
-  text-align: left;
+}
+
+
+.ats-name {
+  min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+
+  font-size: 14px !important;
+  line-height: 1.15;
+  font-weight: 400;
 }
+
+.ats-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.ats-name {
+  font-size: 36px;
+  font-weight: 850;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.ats-percentage {
+  flex: 0 0 auto;
+  white-space: nowrap;
+
+  color: var(--muted);
+  opacity: .65;
+
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+}
+
 .priority-label {
   font-size: 10px;
   font-weight: 800;

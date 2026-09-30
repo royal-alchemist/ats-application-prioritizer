@@ -75,53 +75,206 @@
   }
 
   function installDragBehavior(body, handle) {
+    let dragging = false;
+    let pointerId = null;
+  
+    let offsetX = 0;
+    let offsetY = 0;
+  
+    let bodyWidth = 0;
+    let bodyHeight = 0;
+  
+    let previousUserSelect = "";
+  
+  
+    function stopDrag() {
+      if (!dragging) return;
+  
+      dragging = false;
+      body.classList.remove("dragging");
+  
+      window.removeEventListener("pointermove", onMove, true);
+      window.removeEventListener("pointerup", stopDrag, true);
+      window.removeEventListener("pointercancel", stopDrag, true);
+      window.removeEventListener("blur", stopDrag);
+  
+      document.removeEventListener(
+        "visibilitychange",
+        onVisibilityChange
+      );
+  
+      document.documentElement.style.userSelect =
+        previousUserSelect;
+  
+      try {
+        if (
+          pointerId !== null &&
+          handle.hasPointerCapture(pointerId)
+        ) {
+          handle.releasePointerCapture(pointerId);
+        }
+      } catch {}
+  
+      pointerId = null;
+    }
+  
+  
+    function onVisibilityChange() {
+      if (document.hidden) stopDrag();
+    }
+  
+  
+    function onMove(event) {
+      if (
+        !dragging ||
+        event.pointerId !== pointerId
+      ) {
+        return;
+      }
+  
+      /*
+       * Safety valve:
+       * if Chrome missed pointerup because the mouse
+       * was released outside the browser/handle,
+       * stop as soon as we see the left button isn't down.
+       */
+      if ((event.buttons & 1) === 0) {
+        stopDrag();
+        return;
+      }
+  
+      const maxX = Math.max(
+        8,
+        window.innerWidth - bodyWidth - 8
+      );
+  
+      const maxY = Math.max(
+        8,
+        window.innerHeight - bodyHeight - 8
+      );
+  
+      const x = Math.min(
+        Math.max(8, event.clientX - offsetX),
+        maxX
+      );
+  
+      const y = Math.min(
+        Math.max(8, event.clientY - offsetY),
+        maxY
+      );
+  
+      body.style.left = `${x}px`;
+      body.style.top = `${y}px`;
+    }
+  
+  
     handle.addEventListener("pointerdown", event => {
-      if (event.button !== 0) return;
-
+      if (
+        event.button !== 0 ||
+        dragging
+      ) {
+        return;
+      }
+  
       event.preventDefault();
       event.stopPropagation();
-
+  
       const rect = body.getBoundingClientRect();
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const originX = rect.left;
-      const originY = rect.top;
-
-      handle.setPointerCapture(event.pointerId);
+  
+      dragging = true;
+      pointerId = event.pointerId;
+  
+      /*
+       * Calculate these ONCE rather than forcing
+       * layout on every mouse movement.
+       */
+      bodyWidth = rect.width;
+      bodyHeight = rect.height;
+  
+      offsetX = event.clientX - rect.left;
+      offsetY = event.clientY - rect.top;
+  
       body.classList.add("dragging");
-
-      const onMove = moveEvent => {
-        const next = clampPosition(
-          originX + moveEvent.clientX - startX,
-          originY + moveEvent.clientY - startY,
-          body
-        );
-
-        body.style.left = `${next.x}px`;
-        body.style.top = `${next.y}px`;
-      };
-
-      const onEnd = async endEvent => {
-        handle.removeEventListener("pointermove", onMove);
-        handle.removeEventListener("pointerup", onEnd);
-        handle.removeEventListener("pointercancel", onEnd);
-        body.classList.remove("dragging");
-
-        try {
-          handle.releasePointerCapture(endEvent.pointerId);
-        } catch {}
-
-      };
-
-      handle.addEventListener("pointermove", onMove);
-      handle.addEventListener("pointerup", onEnd);
-      handle.addEventListener("pointercancel", onEnd);
+  
+      previousUserSelect =
+        document.documentElement.style.userSelect;
+  
+      document.documentElement.style.userSelect =
+        "none";
+  
+      try {
+        handle.setPointerCapture(pointerId);
+      } catch {}
+  
+      /*
+       * Listen globally, not just on the drag strip.
+       */
+      window.addEventListener("pointermove", onMove, true);
+      window.addEventListener("pointerup", stopDrag, true);
+      window.addEventListener("pointercancel", stopDrag, true);
+      window.addEventListener("blur", stopDrag);
+  
+      document.addEventListener(
+        "visibilitychange",
+        onVisibilityChange
+      );
     });
+  
+  
+    /*
+     * Extra protection if Chrome/browser itself
+     * unexpectedly releases pointer capture.
+     */
+    handle.addEventListener(
+      "lostpointercapture",
+      () => {
+        if (dragging) stopDrag();
+      }
+    );
+  }
+
+  function formatOverallPercentage(
+    value
+  ) {
+  
+    if (
+      value === null ||
+      value === undefined ||
+      !Number.isFinite(
+        Number(value)
+      )
+    ) {
+      return "—";
+    }
+  
+  
+    return (
+      Number(value)
+        .toFixed(2) +
+      "%"
+    );
   }
 
   function renderWatermark(result, savedPosition) {
     let watermark = document.getElementById(WATERMARK_ID);
-
+  
+    // Remove watermark DOM made by an older content-script version.
+    if (watermark) {
+      const shadow = watermark.shadowRoot;
+  
+      const valid =
+        shadow &&
+        shadow.querySelector(".watermark") &&
+        shadow.querySelector(".ats-name") &&
+        shadow.querySelector(".ats-percentage") &&
+        shadow.querySelector(".priority");
+  
+      if (!valid) {
+        watermark.remove();
+        watermark = null;
+      }
+    }
+  
     if (!watermark) {
       watermark = document.createElement("div");
       watermark.id = WATERMARK_ID;
@@ -264,10 +417,21 @@
             rgba(255, 255, 255, 0.16);
         }
 
-        .ats-name {
-          font-size: 36px;
-          font-weight: 850;
-          line-height: 1.05;
+        .ats-percentage {
+          flex: 0 0 auto;
+
+          color:
+            rgba(
+              255,
+              255,
+              255,
+              0.68
+            );
+
+          font-size: 17px;
+          font-weight: 700;
+          line-height: 1;
+
           white-space: nowrap;
         }
 
@@ -307,7 +471,11 @@
           ×
         </button>
 
-        <div class="ats-name"></div>
+        <div class="ats-heading">
+          <div class="ats-name"></div>
+          <div class="ats-percentage"></div>
+        </div>
+
         <div class="priority"></div>
       `;
 
@@ -330,6 +498,7 @@
     const shadow = watermark.shadowRoot;
     const body = shadow.querySelector(".watermark");
     const name = shadow.querySelector(".ats-name");
+    const percentage = shadow.querySelector(".ats-percentage");
     const priority = shadow.querySelector(".priority");
 
     body.classList.remove("p0", "p1", "p2", "p3");
@@ -338,8 +507,18 @@
     const watermarkLabel =
       result.priority.watermarkLabel ?? result.priority.label;
 
-    name.textContent = result.name;
-    priority.textContent = watermarkLabel;
+    if (name) {
+      name.textContent = result.name;
+    }
+    
+    if (percentage) {
+      percentage.textContent =
+        formatOverallPercentage(result.overallPercentage);
+    }
+    
+    if (priority) {
+      priority.textContent = watermarkLabel;
+    }
 
     body.title =
       `${result.name}\n${watermarkLabel}\nMatched: ${result.matchedString}`;

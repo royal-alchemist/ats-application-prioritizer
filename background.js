@@ -42,7 +42,14 @@ function classifyTab(tab) {
     ats: result.name,
     group: result.group,
     priorityLabel: result.priority.label,
-    watermarkLabel: result.priority.watermarkLabel ?? result.priority.label
+    watermarkLabel:
+      result.priority.watermarkLabel ??
+      result.priority.label,
+    /*
+     * Future/statistical metadata.
+     * Does NOT affect priority.
+     */
+    overallPercentage: result.overallPercentage ?? null
   };
 }
 
@@ -97,20 +104,114 @@ async function focusTab(tabId, windowId) {
 async function closeTabWithPolicy(tabId, alsoCloseLeft) {
   const tab = await chrome.tabs.get(tabId);
   const tabs = await chrome.tabs.query({ windowId: tab.windowId });
+
   tabs.sort((a, b) => a.index - b.index);
 
   const currentIndex = tabs.findIndex(t => t.id === tabId);
+  if (currentIndex < 0) {
+    throw new Error("Application tab was not found.");
+  }
+
   const idsToClose = [tabId];
 
   if (alsoCloseLeft && currentIndex > 0) {
     const leftTab = tabs[currentIndex - 1];
-    if (leftTab?.id != null) idsToClose.unshift(leftTab.id);
+
+    if (leftTab?.id != null) {
+      idsToClose.unshift(leftTab.id);
+    }
   }
 
   const uniqueIds = [...new Set(idsToClose)];
+
+  /*
+   * Only force navigation when:
+   *   1. "Close source tab" is enabled
+   *   2. the application tab being closed is currently active
+   *
+   * This avoids stealing focus when closing some other row
+   * from the sidebar.
+   */
+  let nextApplicationTabId = null;
+
+  if (alsoCloseLeft && tab.active) {
+    /*
+     * Search RIGHT first.
+     *
+     * Typical layout:
+     *
+     * source A | apply A | source B | apply B
+     *              ↑ closing
+     *
+     * Chrome normally lands on source B.
+     * We skip it and activate apply B instead.
+     */
+    for (let i = currentIndex + 1; i < tabs.length; i++) {
+      const candidate = tabs[i];
+
+      if (
+        candidate?.id == null ||
+        uniqueIds.includes(candidate.id)
+      ) {
+        continue;
+      }
+
+      if (classifyTab(candidate)) {
+        nextApplicationTabId = candidate.id;
+        break;
+      }
+    }
+
+    /*
+     * If this was the final application pair,
+     * fall back to the nearest application tab
+     * on the LEFT rather than landing on a source tab.
+     */
+    if (nextApplicationTabId == null) {
+      for (let i = currentIndex - 1; i >= 0; i--) {
+        const candidate = tabs[i];
+
+        if (
+          candidate?.id == null ||
+          uniqueIds.includes(candidate.id)
+        ) {
+          continue;
+        }
+
+        if (classifyTab(candidate)) {
+          nextApplicationTabId = candidate.id;
+          break;
+        }
+      }
+    }
+  }
+
   await chrome.tabs.remove(uniqueIds);
+
+  /*
+   * Chrome may briefly choose a source tab after removal.
+   * Override that choice with the next application tab.
+   */
+  if (nextApplicationTabId != null) {
+    try {
+      await chrome.tabs.update(
+        nextApplicationTabId,
+        { active: true }
+      );
+    } catch (error) {
+      console.warn(
+        "Could not activate next application tab:",
+        error
+      );
+    }
+  }
+
   await rebuildTabState();
-  return uniqueIds;
+
+  return {
+    closedTabIds: uniqueIds,
+    activatedTabId: nextApplicationTabId
+  };
 }
 
 function isJobrightPostingUrl(url) {
@@ -924,59 +1025,37 @@ async function openRightOfSource(
 
 async function openAllApplicationPages() {
 
-  /*
-   * The side panel belongs conceptually to the
-   * currently focused Chrome window.
-   */
   const currentWindow =
     await chrome.windows.getLastFocused({
-      windowTypes: [
-        "normal"
-      ]
+      windowTypes: ["normal"]
     });
 
 
-  if (
-    currentWindow?.id == null
-  ) {
-    throw new Error(
-      "No active Chrome window"
-    );
-  }
-
-
-  let tabs =
+  const tabs =
     await chrome.tabs.query({
       windowId:
         currentWindow.id
     });
 
 
-  /*
-   * IMPORTANT:
-   *
-   * Inspect in exactly the user's visual order:
-   *
-   * left → right.
-   */
   tabs.sort(
     (a, b) =>
       a.index - b.index
   );
 
 
-  let recognized = 0;
-  let opened = 0;
-  let alreadyOpen = 0;
-  let notFound = 0;
-  let failed = 0;
+  const stats = {
+    recognized: 0,
+    opened: 0,
+    alreadyOpen: 0,
+    notFound: 0,
+    failed: 0
+  };
 
 
   for (const tab of tabs) {
 
-    if (
-      tab.id == null
-    ) {
+    if (tab.id == null) {
       continue;
     }
 
@@ -992,9 +1071,14 @@ async function openAllApplicationPages() {
     }
 
 
-    recognized++;
+    stats.recognized++;
 
 
+    /*
+     * CRITICAL:
+     * one broken / unloaded tab must NOT
+     * abort the entire 54-tab batch.
+     */
     try {
 
       const destination =
@@ -1009,71 +1093,376 @@ async function openAllApplicationPages() {
         !destination.url
       ) {
 
-        notFound++;
+        stats.notFound++;
 
         console.debug(
-          "Apply destination not found:",
-          siteKind,
-          tab.url,
-          destination?.reason
+          "[Prioritizer] apply URL not found",
+          {
+            siteKind,
+            tabId: tab.id,
+            url: tab.url,
+            destination
+          }
         );
 
         continue;
-
       }
 
 
-      const result =
-        await openRightOfSource(
-          tab.id,
-          destination.url
+      const sourceTab =
+        await chrome.tabs.get(
+          tab.id
         );
 
 
-      if (
-        result.alreadyOpen
-      ) {
+      /*
+       * Check only within this window.
+       */
+      const openTabs =
+        await chrome.tabs.query({
+          windowId:
+            sourceTab.windowId
+        });
 
-        alreadyOpen++;
 
-      } else if (
-        result.opened
-      ) {
+      const alreadyOpen =
+        openTabs.some(
+          openTab =>
+            openTab.url ===
+            destination.url
+        );
 
-        opened++;
 
+      if (alreadyOpen) {
+
+        stats.alreadyOpen++;
+
+        continue;
       }
+
+
+      await chrome.tabs.create({
+
+        windowId:
+          sourceTab.windowId,
+
+        index:
+          sourceTab.index + 1,
+
+        url:
+          destination.url,
+
+        active:
+          false
+
+      });
+
+
+      stats.opened++;
+
+
+      /*
+       * Tiny pause avoids hammering Chrome with
+       * dozens of tab creations simultaneously.
+       */
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            60
+          )
+      );
 
 
     } catch (error) {
 
-      failed++;
+      stats.failed++;
+
 
       console.error(
-        "Failed to open application page:",
-        siteKind,
-        tab.url,
-        error
+        "[Prioritizer] failed source tab",
+        {
+          tabId:
+            tab.id,
+
+          siteKind,
+
+          url:
+            tab.url,
+
+          error:
+            error?.message ??
+            String(error)
+        }
       );
+
+
+      /*
+       * Continue with remaining tabs.
+       */
+      continue;
 
     }
 
   }
 
 
+  await rebuildTabState();
+
+
+  return stats;
+}
+
+async function sortTabsBySidebar({
+  windowId,
+  orderedApplicationTabIds,
+  pairSourceTabs
+}) {
+
   /*
-   * Let the newly opened ATS pages immediately
-   * appear in Prioritizer.
+   * Take one snapshot BEFORE doing any movement.
+   *
+   * This matters because "left-adjacent source tab"
+   * must mean left-adjacent BEFORE sorting starts.
+   */
+  const tabs =
+    await chrome.tabs.query({
+      windowId
+    });
+
+
+  tabs.sort(
+    (a, b) =>
+      a.index - b.index
+  );
+
+
+  const byId =
+    new Map(
+      tabs.map(
+        tab => [
+          tab.id,
+          tab
+        ]
+      )
+    );
+
+
+  const applicationSet =
+    new Set(
+      orderedApplicationTabIds
+    );
+
+
+  const claimedSourceTabs =
+    new Set();
+
+
+  const orderedBlocks = [];
+
+
+  for (
+    const applicationTabId
+    of orderedApplicationTabIds
+  ) {
+
+    const applicationTab =
+      byId.get(
+        applicationTabId
+      );
+
+
+    /*
+     * Application may have been closed while
+     * sorting was requested.
+     */
+    if (!applicationTab) {
+      continue;
+    }
+
+
+    const block = [];
+
+
+    if (pairSourceTabs) {
+
+      /*
+       * Find app's ORIGINAL position from the
+       * pre-sort snapshot.
+       */
+      const position =
+        tabs.findIndex(
+          tab =>
+            tab.id ===
+            applicationTabId
+        );
+
+
+      if (position > 0) {
+
+        const possibleSource =
+          tabs[position - 1];
+
+
+        /*
+         * Only pair it when:
+         *
+         * 1. it is one of our four source sites,
+         * 2. it is not itself an application tab,
+         * 3. another application hasn't already
+         *    claimed it.
+         */
+        const sourceKind =
+          detectJobSiteKind(
+            possibleSource.url
+          );
+
+
+        if (
+          sourceKind &&
+          !applicationSet.has(
+            possibleSource.id
+          ) &&
+          !claimedSourceTabs.has(
+            possibleSource.id
+          )
+        ) {
+
+          block.push(
+            possibleSource.id
+          );
+
+
+          claimedSourceTabs.add(
+            possibleSource.id
+          );
+
+        }
+
+      }
+
+    }
+
+
+    /*
+     * Application always comes after its
+     * source tab.
+     */
+    block.push(
+      applicationTabId
+    );
+
+
+    orderedBlocks.push(
+      block
+    );
+
+  }
+
+
+  /*
+   * Flatten:
+   *
+   * [
+   *   [source1, app1],
+   *   [source2, app2],
+   *   [app3]
+   * ]
+   *
+   * becomes:
+   *
+   * source1, app1,
+   * source2, app2,
+   * app3
+   */
+  const orderedTabIds =
+    orderedBlocks.flat();
+
+
+  if (
+    orderedTabIds.length === 0
+  ) {
+
+    return {
+      applicationTabs: 0,
+      sourceTabs: 0,
+      movedTabs: 0
+    };
+
+  }
+
+
+  /*
+   * Don't try to mix pinned and normal tabs.
+   */
+  const includedTabs =
+    orderedTabIds
+      .map(id => byId.get(id))
+      .filter(Boolean);
+
+
+  const hasPinned =
+    includedTabs.some(
+      tab => tab.pinned
+    );
+
+
+  if (hasPinned) {
+
+    throw new Error(
+      "Unpin the job/application tabs before sorting."
+    );
+
+  }
+
+
+  /*
+   * Start at the leftmost position currently
+   * occupied by any tab participating in the sort.
+   *
+   * Unrelated tabs before that point stay before
+   * the sorted job/application block.
+   */
+  const startIndex =
+    Math.min(
+      ...includedTabs.map(
+        tab => tab.index
+      )
+    );
+
+
+  /*
+   * Chrome accepts an array of IDs.
+   *
+   * Their order in this array becomes their
+   * relative left→right order.
+   */
+  await chrome.tabs.move(
+    orderedTabIds,
+    {
+      index:
+        startIndex
+    }
+  );
+
+
+  /*
+   * Their tab.index values have changed.
    */
   await rebuildTabState();
 
 
   return {
-    recognized,
-    opened,
-    alreadyOpen,
-    notFound,
-    failed
+
+    applicationTabs:
+      orderedBlocks.length,
+
+    sourceTabs:
+      claimedSourceTabs.size,
+
+    movedTabs:
+      orderedTabIds.length
+
   };
 }
 
@@ -1095,15 +1484,65 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch(error => {
   
         console.error(
-          "Bulk application-page opening failed:",
+          "OPEN_ALL_APPLICATION_PAGES failed:",
+          error
+        );
+  
+        sendResponse({
+          ok: false,
+          error:
+            error?.message ??
+            String(error)
+        });
+  
+      });
+  
+    return true;
+  }
+
+  if (
+    message?.type ===
+    "SORT_TABS_BY_SIDEBAR"
+  ) {
+  
+    sortTabsBySidebar({
+  
+      windowId:
+        message.windowId,
+  
+      orderedApplicationTabIds:
+        message.orderedApplicationTabIds ??
+        [],
+  
+      pairSourceTabs:
+        Boolean(
+          message.pairSourceTabs
+        )
+  
+    })
+      .then(result => {
+  
+        sendResponse({
+          ok: true,
+          ...result
+        });
+  
+      })
+      .catch(error => {
+  
+        console.error(
+          "SORT_TABS_BY_SIDEBAR failed:",
           error
         );
   
   
         sendResponse({
           ok: false,
+  
           error:
-            error.message
+            error?.message ??
+            String(error)
+  
         });
   
       });

@@ -18,25 +18,59 @@
     
       <div class="header-actions">
     
+        <!-- Open all application pages -->
         <button
           id="openApplyPages"
           class="header-icon-button"
           type="button"
           aria-label="Open application pages"
-          title="Open application pages from all job-site tabs"
+          title="Open application pages"
         >
-          ↗
+          <svg
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+          >
+            <path
+              fill="currentColor"
+              d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"
+            />
+            <path
+              fill="currentColor"
+              d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"
+            />
+          </svg>
         </button>
     
     
+        <!-- Sort tabs -->
+        <button
+          id="sortTabs"
+          class="header-icon-button"
+          type="button"
+          aria-label="Sort tabs"
+          title="Sort tabs to match sidebar order"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+          >
+            <path
+              fill="currentColor"
+              fill-rule="evenodd"
+              d="M3.5 2.5a.5.5 0 0 1 1 0v9.793l1.146-1.147a.5.5 0 0 1 .708.708l-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L3.5 12.293V2.5zm9 11a.5.5 0 0 1-1 0V3.707l-1.146 1.147a.5.5 0 0 1-.708-.708l2-2a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1-.708.708L12.5 3.707V13.5z"
+            />
+          </svg>
+        </button>
+    
+    
+        <!-- Theme -->
         <button
           id="themeToggle"
-          class="theme-toggle"
+          class="header-icon-button"
           type="button"
           aria-label="Toggle theme"
-        >
-          ☾
-        </button>
+          title="Toggle light/dark theme"
+        ></button>
     
       </div>
     
@@ -86,7 +120,7 @@
       </div>
 
       <div class="setting-row">
-        <span>Also close source tab (left)</span>
+        <span>Close source tab too</span>
         <label class="switch">
           <input id="closeLeftToggle" type="checkbox">
           <span class="slider"></span>

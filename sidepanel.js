@@ -3,6 +3,7 @@
 
   const elements = {
     openApplyPages: document.getElementById("openApplyPages"),
+    sortTabs: document.getElementById("sortTabs"),
     themeToggle: document.getElementById("themeToggle"),
     countAll: document.getElementById("countAll"),
     countP0: document.getElementById("countP0"),
@@ -15,6 +16,45 @@
     closeLinkedIn: document.getElementById("closeLinkedIn"),
     watermarkToggle: document.getElementById("watermarkToggle"),
     closeLeftToggle: document.getElementById("closeLeftToggle")
+  };
+
+  const HEADER_ICONS = {
+
+    sun: `
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+      >
+        <path
+          fill="currentColor"
+          d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"
+        />
+        <path
+          fill="currentColor"
+          d="M8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zM16 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 16 8zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8z"
+        />
+        <path
+          fill="currentColor"
+          d="M13.657 2.343a.5.5 0 0 1 0 .707l-1.414 1.414a.5.5 0 1 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zM4.464 11.536a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 1 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zM13.657 13.657a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.464a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707z"
+        />
+      </svg>
+    `,
+    
+    moon: `
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          d="M20.4 15.6A8.5 8.5 0 0 1 8.4 3.6 8.5 8.5 0 1 0 20.4 15.6Z"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    `
   };
 
   let tabState = {};
@@ -52,7 +92,9 @@
 
   function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
-    elements.themeToggle.textContent = theme === "dark" ? "☀" : "☾";
+    elements.themeToggle.innerHTML = theme === "dark"
+      ? HEADER_ICONS.sun
+      : HEADER_ICONS.moon;
   }
 
   async function setWatermark(enabled) {
@@ -91,92 +133,268 @@
     return items;
   }
 
-  function render() {
-    const items = getSortedItems();
-    renderCounts(items);
-    renderRows(items);
-    updateRowStates();
+  async function sortBrowserTabs() {
 
-    if (activeTabId != null) {
-      scrollTabIntoView(activeTabId, false);
+    const button =
+      elements.sortTabs;
+  
+  
+    button.disabled = true;
+  
+    button.textContent = "…";
+  
+  
+    try {
+  
+      /*
+       * Find the Chrome window represented by
+       * the currently active tab.
+       */
+      const activeTabs =
+        await chrome.tabs.query({
+          active: true,
+          lastFocusedWindow: true
+        });
+  
+  
+      const activeTab =
+        activeTabs[0];
+  
+  
+      if (
+        !activeTab ||
+        activeTab.windowId == null
+      ) {
+        throw new Error(
+          "Could not determine current Chrome window."
+        );
+      }
+  
+  
+      const windowId =
+        activeTab.windowId;
+  
+  
+      /*
+       * IMPORTANT:
+       *
+       * Use EXACTLY the same ordering as the
+       * sidebar itself.
+       */
+      const orderedItems =
+        getSortedItems()
+          .filter(
+            item =>
+              item.windowId ===
+              windowId
+          );
+  
+  
+      const orderedApplicationTabIds =
+        orderedItems.map(
+          item => item.tabId
+        );
+  
+  
+      if (
+        orderedApplicationTabIds.length === 0
+      ) {
+  
+        button.textContent = "0";
+  
+        return;
+  
+      }
+  
+  
+      const response =
+        await chrome.runtime.sendMessage({
+  
+          type:
+            "SORT_TABS_BY_SIDEBAR",
+  
+          windowId,
+  
+          orderedApplicationTabIds,
+  
+          /*
+           * Reuse the SAME switch that controls
+           * close-current + close-left behavior.
+           */
+          pairSourceTabs:
+            elements.closeLeftToggle.checked
+  
+        });
+  
+  
+      if (!response?.ok) {
+  
+        throw new Error(
+          response?.error ||
+          "Tab sorting failed."
+        );
+  
+      }
+  
+  
+      button.textContent =
+        "✓";
+  
+  
+      button.title =
+        [
+          `Application tabs sorted: ${response.applicationTabs}`,
+          `Source tabs paired: ${response.sourceTabs}`,
+          `Total tabs moved: ${response.movedTabs}`
+        ].join("\n");
+  
+  
+      /*
+       * Their indices changed, so refresh sidebar
+       * state afterwards.
+       */
+      await loadTabState();
+  
+  
+      await syncActiveTab({
+        scroll: true
+      });
+  
+  
+      window.setTimeout(
+        () => {
+  
+          button.textContent =
+            "⇅";
+  
+        },
+        1200
+      );
+  
+  
+    } catch (error) {
+  
+      console.error(
+        "Sort tabs failed:",
+        error
+      );
+  
+  
+      button.textContent =
+        "!";
+  
+  
+      button.title =
+        error?.message ??
+        String(error);
+  
+  
+    } finally {
+  
+      button.disabled =
+        false;
+  
     }
   }
 
-  function renderCounts(items) {
+  function render() {
+    const items = getSortedItems();
     const counts = { all: 0, P0: 0, P1: 0, P2: 0, P3: 0 };
-
+  
     for (const item of items) {
       counts.all++;
-      if (Object.prototype.hasOwnProperty.call(counts, item.group)) {
-        counts[item.group]++;
-      }
+      if (item.group in counts) counts[item.group]++;
     }
-
+  
     elements.countAll.textContent = counts.all;
     elements.countP0.textContent = counts.P0;
     elements.countP1.textContent = counts.P1;
     elements.countP2.textContent = counts.P2;
     elements.countP3.textContent = counts.P3;
+  
+    renderRows(items);
+    updateRowStates();
+  
+    if (activeTabId != null) {
+      scrollTabIntoView(activeTabId, false);
+    }
   }
-
+  
+  
   function renderRows(items) {
     elements.tabList.innerHTML = "";
-    const isEmpty = items.length === 0;
-
-    elements.tabList.classList.toggle("hidden", isEmpty);
-    elements.emptyState.classList.toggle("visible", isEmpty);
-
+  
+    const empty = items.length === 0;
+    elements.tabList.classList.toggle("hidden", empty);
+    elements.emptyState.classList.toggle("visible", empty);
+  
     for (const item of items) {
       elements.tabList.appendChild(createRow(item));
     }
   }
-
+  
+  
+  function formatPercentage(value) {
+    if (value == null || !Number.isFinite(Number(value))) {
+      return "—";
+    }
+  
+    return `${Number(value).toFixed(2)}%`;
+  }
+  
+  
   function createRow(item) {
     const row = document.createElement("div");
     row.className = "tab-entry";
     row.dataset.tabId = String(item.tabId);
     row.setAttribute("role", "button");
     row.tabIndex = 0;
-
-    // Native Chrome tab-hover previews cannot be triggered by extensions.
-    // Provide the linked tab title/URL as a useful sidebar hover tooltip.
     row.title = `${item.title || item.ats}\n${item.url}`;
-
+  
     const dot = document.createElement("span");
     dot.className = `dot ${item.group.toLowerCase()}`;
-
+  
+    const nameArea = document.createElement("span");
+    nameArea.className = "ats-name-area";
+  
     const name = document.createElement("span");
     name.className = "ats-name";
     name.textContent = item.ats;
-
+  
+    const percentage = document.createElement("span");
+    percentage.className = "ats-percentage";
+    percentage.textContent = formatPercentage(item.overallPercentage);
+  
+    nameArea.append(name, percentage);
+  
     const priority = document.createElement("span");
     priority.className = "priority-label";
     priority.textContent = item.priorityLabel;
-
+  
     const closeButton = document.createElement("button");
     closeButton.type = "button";
     closeButton.className = "close-tab";
     closeButton.title = "Close linked tab";
     closeButton.setAttribute("aria-label", `Close ${item.ats} tab`);
-
+  
     closeButton.addEventListener("click", event => {
       event.stopPropagation();
       closeLinkedTab(item);
     });
-
-    row.append(dot, name, priority, closeButton);
-
-    row.addEventListener("click", async () => {
-      await focusLinkedTab(item);
+  
+    row.append(dot, nameArea, priority, closeButton);
+  
+    row.addEventListener("click", () => {
+      focusLinkedTab(item);
     });
-
-    row.addEventListener("keydown", async event => {
+  
+    row.addEventListener("keydown", event => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        await focusLinkedTab(item);
+        focusLinkedTab(item);
       }
     });
-
+  
     return row;
   }
 
@@ -418,6 +636,7 @@
 
   function bindEvents() {
     elements.openApplyPages.addEventListener("click", openAllApplicationPages);
+    elements.sortTabs.addEventListener("click", sortBrowserTabs);
     elements.themeToggle.addEventListener("click", toggleTheme);
     elements.reprioritize.addEventListener("click", reprioritize);
     elements.closeLinkedIn.addEventListener("click", closeJobrightLinkedInTabs);
