@@ -454,29 +454,69 @@
   }
 
   async function closeLinkedTab(item) {
+    const itemsBeforeClose = getSortedItems();
+    const closingIndex = itemsBeforeClose.findIndex(
+      candidate => candidate.tabId === item.tabId
+    );
+  
+    const wasSelected = item.tabId === activeTabId;
+  
+    /*
+     * If the selected row is being closed:
+     * prefer the row immediately ABOVE it.
+     *
+     * If it was already the first row, fall back
+     * to the row immediately below it.
+     */
+    let nextSelection = null;
+  
+    if (wasSelected && closingIndex >= 0) {
+      nextSelection =
+        itemsBeforeClose[closingIndex - 1] ??
+        itemsBeforeClose[closingIndex + 1] ??
+        null;
+    }
+  
     const response = await chrome.runtime.sendMessage({
       type: "CLOSE_TAB_WITH_POLICY",
       tabId: item.tabId,
       alsoCloseLeft: elements.closeLeftToggle.checked
     });
-
+  
     if (!response?.ok) {
-      console.error("Failed to close tab:", response?.error);
+      console.error(
+        "Failed to close tab:",
+        response?.error
+      );
       return;
     }
-
+  
     const closed = response.closedTabIds ?? [];
-
+  
     for (const tabId of closed) {
       delete tabState[tabId];
     }
-
-    if (closed.includes(activeTabId)) {
-      activeTabId = null;
-    }
-
+  
     render();
-    await syncActiveTab({ scroll: true });
+  
+    /*
+     * Only change selection when the CLOSED row
+     * was the currently selected/red-circle row.
+     */
+    if (
+      wasSelected &&
+      nextSelection &&
+      !closed.includes(nextSelection.tabId)
+    ) {
+      await focusLinkedTab(nextSelection);
+      return;
+    }
+  
+    /*
+     * Closing some other row should preserve
+     * whatever Chrome tab is currently active.
+     */
+    await syncActiveTab({ scroll: false });
   }
 
   async function openAllApplicationPages() {

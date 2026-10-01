@@ -365,6 +365,8 @@ function detectJobSiteKind(url) {
      * HiringCafe
      */
     if (
+      host === "hiringcafe.com" ||
+      host.endsWith(".hiringcafe.com") ||
       host === "hiring.cafe" ||
       host.endsWith(".hiring.cafe")
     ) {

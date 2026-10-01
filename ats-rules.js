@@ -822,6 +822,7 @@
 
       "jobright.ai",
       "hiring.cafe",
+      "hiringcafe.com",
       "remoterocketship.com",
       "builtin.com",
 
